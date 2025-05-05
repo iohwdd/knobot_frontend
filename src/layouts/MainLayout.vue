@@ -39,6 +39,7 @@
             </a-button>
           </div>
           <div class="header-right">
+            <WeatherWidget />
             <a-switch
               v-model="isDark"
               :default-checked="false"
@@ -80,6 +81,7 @@ import {
   IconSun,
   IconUser
 } from '@arco-design/web-vue/es/icon'
+import WeatherWidget from '@/components/WeatherWidget.vue'
 
 const route = useRoute()
 const router = useRouter()

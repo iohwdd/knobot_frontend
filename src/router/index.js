@@ -10,7 +10,14 @@ const routes = [
       {
         path: '/chat',
         name: 'Chat',
-        component: () => import('../views/Chat.vue')
+        component: () => import('../views/Chat.vue'),
+        children: [
+          {
+            path: ':memoryId',
+            name: 'chat-session',
+            component: () => import('../views/Chat.vue')
+          }
+        ]
       },
       {
         path: '/knowledge',
