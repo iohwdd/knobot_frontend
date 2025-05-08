@@ -135,18 +135,24 @@ const knowledgeList = ref([])
 // 获取知识库列表
 const fetchKnowledgeList = async () => {
   try {
+    const userId = userStore.getUserId();
+    if (!userId) {
+      Message.error('用户未登录或用户ID无效');
+      return;
+    }
+
     const response = await axios.get('/api/library/queryLibraryDetailList', {
       params: {
-        userId: userStore.userId
+        userId: userId
       }
-    })
+    });
 
-    console.log('获取到的知识库列表响应:', response.data)
+    console.log('获取到的知识库列表响应:', response.data);
 
     if (response.data.code === '200') {
       // 处理返回的数据，格式化时间
       // 确保 response.data.data 存在，如果为空则使用空数组
-      const libraryList = response.data.data || []
+      const libraryList = response.data.data || [];
       knowledgeList.value = libraryList.map(item => ({
         knowledgeLibId: item.knowledgeLibId,
         knowledgeLibName: item.knowledgeLibName,
@@ -161,19 +167,19 @@ const fetchKnowledgeList = async () => {
           second: '2-digit',
           hour12: false
         }) : '-'
-      }))
+      }));
     } else {
       // 如果请求失败，设置为空数组
-      knowledgeList.value = []
-      Message.error(response.data.msg || '获取知识库列表失败')
+      knowledgeList.value = [];
+      Message.error(response.data.msg || '获取知识库列表失败');
     }
   } catch (error) {
-    console.error('获取知识库列表失败:', error)
+    console.error('获取知识库列表失败:', error);
     // 发生错误时，也设置为空数组
-    knowledgeList.value = []
-    Message.error('获取知识库列表失败')
+    knowledgeList.value = [];
+    Message.error('获取知识库列表失败');
   }
-}
+};
 
 // 初始化获取知识库列表
 onMounted(() => {
@@ -214,40 +220,47 @@ const handleCreateConfirm = async (done) => {
 // 表单提交逻辑，只有在验证通过后才会调用
 const submitForm = async (done) => {
   try {
+    const userId = userStore.getUserId();
+    if (!userId) {
+      Message.error('用户未登录或用户ID无效');
+      done(false);
+      return;
+    }
+
     let response;
     if (isEdit.value) {
       response = await axios.post('/api/library/updateKnowledgeLib', {
         knowledgeLibId: formData.value.knowledgeLibId,
         knowledgeLibName: formData.value.name.trim(),
         knowledgeLibDesc: formData.value.description.trim(),
-        userId: userStore.userId
-      })
+        userId: userId
+      });
     } else {
       response = await axios.post('/api/library/createKnowledgeLib', {
         knowledgeLibName: formData.value.name.trim(),
         knowledgeLibDesc: formData.value.description.trim(),
-        userId: userStore.userId
-      })
+        userId: userId
+      });
     }
 
     // 处理响应
     if (response.data.code === '200') {
-      Message.success(isEdit.value ? '更新成功' : '创建成功')
+      Message.success(isEdit.value ? '更新成功' : '创建成功');
       // 刷新知识库列表
-      await fetchKnowledgeList()
-      resetForm()
-      createModalVisible.value = false
-      done(true)
+      await fetchKnowledgeList();
+      resetForm();
+      createModalVisible.value = false;
+      done(true);
     } else {
-      Message.error(response.data.msg || (isEdit.value ? '更新失败' : '创建失败'))
-      done(false)
+      Message.error(response.data.msg || (isEdit.value ? '更新失败' : '创建失败'));
+      done(false);
     }
   } catch (error) {
-    console.error('请求失败:', error)
-    Message.error(error.response?.data?.msg || (isEdit.value ? '更新失败' : '创建失败'))
-    done(false)
+    console.error('请求失败:', error);
+    Message.error(error.response?.data?.msg || (isEdit.value ? '更新失败' : '创建失败'));
+    done(false);
   }
-}
+};
 
 // 重置表单
 const resetForm = () => {

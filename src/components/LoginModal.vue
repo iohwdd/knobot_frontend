@@ -146,7 +146,7 @@ import { ref, watch } from 'vue'
 import { Message } from '@arco-design/web-vue'
 import { IconUser, IconLock } from '@arco-design/web-vue/es/icon'
 import type { FormInstance } from '@arco-design/web-vue'
-import { useUserStore } from '@/stores/user'
+import { useUserStore } from '../stores/user'
 
 const props = defineProps<{
   visible: boolean
@@ -220,17 +220,14 @@ const handleLogin = async () => {
   if (!loginFormRef.value) return
 
   try {
-    // 表单验证
-    const validResult = await loginFormRef.value.validate()
-    // 如果验证通过，validResult 为 undefined
-    if (!validResult) {
-      // 验证通过，执行登录逻辑
-      await submitLogin()
-    }
+    // 表单验证，validate()返回一个Promise
+    await loginFormRef.value.validate();
+    // 验证通过，执行登录逻辑
+    await submitLogin();
   } catch (errors) {
     // 验证失败
-    console.log('登录表单验证失败:', errors)
-    Message.error('请检查表单填写是否正确')
+    console.log('登录表单验证失败:', errors);
+    Message.error('请检查表单填写是否正确');
   }
 }
 
@@ -249,10 +246,43 @@ const submitLogin = async () => {
       })
     });
 
-    const result = await response.json();
+    // 获取响应文本并打印原始内容
+    const responseText = await response.text();
+    console.log('登录原始响应文本:', responseText);
+
+    // 使用特殊处理来保存原始的 userId 字符串
+    // 先用正则表达式找到 "userId":数字 这样的模式
+    const userIdMatch = responseText.match(/"userId"\s*:\s*(\d+)/);
+    let originalUserId = null;
+
+    if (userIdMatch && userIdMatch[1]) {
+      // 提取出原始的数字字符串
+      originalUserId = userIdMatch[1];
+      console.log('从响应中提取的原始 userId 字符串:', originalUserId);
+    }
+
+    // 手动解析 JSON
+    const result = JSON.parse(responseText);
 
     if (result.code === '200') {
-      userStore.setUserInfo(result.data);
+      // 创建用户数据，使用原始提取的 userId 字符串
+      const userData = {
+        ...result.data
+      };
+
+      // 如果成功提取了原始 userId，使用它替换可能已经被转换的值
+      if (originalUserId) {
+        userData.userId = originalUserId;
+      } else if (result.data.userId) {
+        // 备用方案：确保 userId 是字符串
+        userData.userId = String(result.data.userId);
+      }
+
+      console.log('处理后的用户数据:', userData);
+      console.log('最终使用的 userId:', userData.userId);
+      console.log('最终使用的 userId 类型:', typeof userData.userId);
+
+      userStore.setUserInfo(userData);
       Message.success('登录成功');
       loginFormRef.value.resetFields();
       emit('update:visible', false);
@@ -272,17 +302,14 @@ const handleRegister = async () => {
   if (!registerFormRef.value) return
 
   try {
-    // 表单验证
-    const validResult = await registerFormRef.value.validate()
-    // 如果验证通过，validResult 为 undefined
-    if (!validResult) {
-      // 验证通过，执行注册逻辑
-      await submitRegister()
-    }
+    // 表单验证，validate()返回一个Promise
+    await registerFormRef.value.validate();
+    // 验证通过，执行注册逻辑
+    await submitRegister();
   } catch (errors) {
     // 验证失败
-    console.log('注册表单验证失败:', errors)
-    Message.error('请检查表单填写是否正确')
+    console.log('注册表单验证失败:', errors);
+    Message.error('请检查表单填写是否正确');
   }
 }
 

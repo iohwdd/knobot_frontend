@@ -61,22 +61,36 @@
             <!-- 已登录状态 -->
             <a-dropdown v-else>
               <a-avatar
+                :key="avatarKey"
                 :style="{
-                  backgroundColor: '#3370ff',
-                  borderRadius: '8px'
+                  overflow: 'hidden',
+                  borderRadius: '50%'
                 }"
-                :size="32"
+                :size="40"
+                class="user-avatar"
               >
                 <template v-if="userStore.userInfo?.avatarUrl">
-                  <img :src="userStore.userInfo.avatarUrl" />
+                  <img :src="userStore.userInfo.avatarUrl + '?t=' + avatarTimestamp" alt="用户头像" />
                 </template>
                 <template v-else>
-                  <icon-user />
+                  <div class="default-avatar">
+                    <icon-user style="color: #fff; font-size: 24px;" />
+                  </div>
                 </template>
               </a-avatar>
               <template #content>
-                <a-doption @click="router.push('/space')">我的空间</a-doption>
-                <a-doption @click="handleLogout">退出登录</a-doption>
+                <a-doption @click="router.push('/space')" style="padding: 8px 16px;">
+                  <template #icon>
+                    <icon-user style="margin-right: 8px;" />
+                  </template>
+                  我的空间
+                </a-doption>
+                <a-doption @click="handleLogout" style="padding: 8px 16px;">
+                  <template #icon>
+                    <icon-export style="margin-right: 8px;" />
+                  </template>
+                  退出登录
+                </a-doption>
               </template>
             </a-dropdown>
           </div>
@@ -96,7 +110,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted, provide } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useLayoutStore } from '@/stores/layout'
 import { useUserStore } from '@/stores/user'
@@ -108,7 +122,8 @@ import {
   IconMenuUnfold,
   IconMoon,
   IconSun,
-  IconUser
+  IconUser,
+  IconExport
 } from '@arco-design/web-vue/es/icon'
 import WeatherWidget from '@/components/WeatherWidget.vue'
 import LoginModal from '@/components/LoginModal.vue'
@@ -119,6 +134,8 @@ const layoutStore = useLayoutStore()
 const userStore = useUserStore()
 const isDark = ref(false)
 const showLogin = ref(false)
+const avatarKey = ref(0)
+const avatarTimestamp = ref(Date.now())
 
 const selectedKeys = computed(() => {
   const path = route.path
@@ -147,6 +164,40 @@ watch(isDark, (newVal) => {
   document.documentElement.style.colorScheme = newVal ? 'dark' : 'light'
 })
 
+// 监听userStore中头像的变化
+watch(
+  () => userStore.userInfo?.avatarUrl,
+  (newAvatarUrl, oldAvatarUrl) => {
+    if (newAvatarUrl !== oldAvatarUrl) {
+      console.log('[MainLayout] 检测到头像URL变化');
+      // 立即更新时间戳和key强制刷新
+      avatarTimestamp.value = Date.now();
+      avatarKey.value++;
+    }
+  },
+  { immediate: true } // 立即执行一次监听
+);
+
+// 优化头像更新检查
+let intervalId = null;
+
+onMounted(() => {
+  // 每1秒检查一次头像是否需要更新，之前是5秒
+  intervalId = setInterval(() => {
+    if (userStore.userInfo?.avatarUrl) {
+      // 静默刷新时间戳，不增加key
+      avatarTimestamp.value = Date.now();
+    }
+  }, 1000);
+});
+
+// 清理定时器
+onUnmounted(() => {
+  if (intervalId) {
+    clearInterval(intervalId);
+  }
+});
+
 const showLoginModal = () => {
   showLogin.value = true
 }
@@ -161,6 +212,25 @@ const handleLoginSuccess = () => {
   showLogin.value = false
   router.push('/chat')
 }
+
+// 提供一个刷新头像的方法给子组件使用
+const refreshAvatar = () => {
+  console.log('[MainLayout] 手动触发头像刷新');
+  // 使用最新的时间戳
+  avatarTimestamp.value = Date.now();
+  avatarKey.value++;
+
+  // 确保使用的是最新的avatarUrl
+  if (userStore.userInfo?.avatarUrl) {
+    // 清除可能存在的时间戳后缀
+    const url = userStore.userInfo.avatarUrl.split('?')[0];
+    // 重新设置，触发重渲染
+    userStore.updateAvatar(url);
+  }
+};
+
+// 将刷新方法提供给子组件使用
+provide('refreshAvatar', refreshAvatar);
 </script>
 
 <style scoped>
@@ -291,16 +361,36 @@ const handleLoginSuccess = () => {
 :deep(.arco-avatar) {
   cursor: pointer;
   transition: transform 0.2s;
-  border-radius: 8px !important;
+  padding: 0 !important;
+  background: none !important;
+}
+
+:deep(.user-avatar) {
+  border-radius: 50% !important;
+  overflow: hidden !important;
+  border: 2px solid var(--color-neutral-3) !important;
+  width: 40px !important;
+  height: 40px !important;
+}
+
+:deep(.user-avatar img) {
+  border-radius: 50% !important;
+  object-fit: cover !important;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+:deep(.user-avatar:hover) {
+  border-color: var(--color-primary-light-3) !important;
+  transform: scale(1.05);
 }
 
 :deep(.arco-avatar .arco-icon) {
   font-size: 16px;
 }
 
-:deep(.arco-avatar img) {
-  border-radius: 8px;
-  object-fit: cover;
+:deep(.arco-avatar-image) {
+  background: none !important;
 }
 
 :deep(.arco-menu-item) {
@@ -376,6 +466,16 @@ const handleLoginSuccess = () => {
   width: 60px !important;
 }
 
+:deep(.arco-dropdown-option) {
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+:deep(.arco-dropdown-option .arco-icon) {
+  font-size: 16px;
+  vertical-align: -0.125em;
+}
+
 @media screen and (max-width: 1200px) {
   .layout-sider {
     position: fixed;
@@ -401,5 +501,15 @@ const handleLoginSuccess = () => {
   .layout-content {
     padding: 12px;
   }
+}
+
+.default-avatar {
+  width: 100%;
+  height: 100%;
+  background-color: #3370ff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
 }
 </style>

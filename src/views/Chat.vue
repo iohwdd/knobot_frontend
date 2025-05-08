@@ -79,10 +79,12 @@
       <div class="message-list" ref="messageList">
         <div v-for="(msg, index) in messages" :key="index"
           :class="['message-item', msg.type === 'user' ? 'message-user' : 'message-bot']">
-          <a-avatar :style="{ backgroundColor: msg.type === 'user' ? '#3370ff' : '#00b42a' }">
-            <icon-user v-if="msg.type === 'user'" />
-            <icon-robot v-else />
-          </a-avatar>
+          <div class="avatar-container">
+            <a-avatar>
+              <icon-user v-if="msg.type === 'user'" style="color: #FFFFFF;" />
+              <icon-customer-service v-else style="color: #FFFFFF;" />
+            </a-avatar>
+          </div>
           <div v-if="msg.type === 'user'" class="message-content">
             {{ msg.content }}
           </div>
@@ -161,7 +163,11 @@
             <span class="required-mark">*</span>
             <span class="form-label">标题</span>
           </div>
-          <a-form-item field="title" :rules="[{ required: true, message: '请输入标题' }]" hide-label>
+          <a-form-item field="title" :rules="[
+            { required: true, message: '请输入标题' },
+            { minLength: 2, message: '标题至少2个字符' },
+            { maxLength: 50, message: '标题不能超过50个字符' }
+          ]" hide-label>
             <a-input v-model="feedbackForm.title" placeholder="请输入标题" allow-clear />
           </a-form-item>
 
@@ -169,11 +175,17 @@
             <span class="required-mark">*</span>
             <span class="form-label">问题描述</span>
           </div>
-          <a-form-item field="issueDescription" :rules="[{ required: true, message: '请输入问题描述' }]" hide-label>
+          <a-form-item field="issueDescription" :rules="[
+            { required: true, message: '请输入问题描述' },
+            { minLength: 10, message: '问题描述至少10个字符' },
+            { maxLength: 500, message: '问题描述不能超过500个字符' }
+          ]" hide-label>
             <a-textarea
               v-model="feedbackForm.issueDescription"
               placeholder="请详细描述您遇到的问题或建议"
               :auto-size="{ minRows: 6, maxRows: 8 }"
+              :maxLength="500"
+              :show-word-limit="true"
               allow-clear
             />
           </a-form-item>
@@ -181,8 +193,10 @@
       </div>
       <template #footer>
         <div class="feedback-footer">
-          <a-button @click="handleCancelFeedback">取消</a-button>
-          <a-button type="primary" @click="handleSubmitFeedback">提交</a-button>
+          <a-button @click="handleCancelFeedback" :disabled="isSubmitting">取消</a-button>
+          <a-button type="primary" @click="handleSubmitFeedback" :loading="isSubmitting" :disabled="isSubmitting">
+            {{ isSubmitting ? '提交中...' : '提交' }}
+          </a-button>
         </div>
       </template>
     </a-modal>
@@ -191,7 +205,21 @@
 
 <script setup>
 import { ref, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
-import { IconPlus, IconMessage, IconUser, IconRobot, IconAttachment, IconSend, IconFile, IconClose, IconDelete, IconEdit, IconSearch, IconExclamation, IconMoreVertical } from '@arco-design/web-vue/es/icon'
+import {
+  IconPlus,
+  IconMessage,
+  IconUser,
+  IconCustomerService,
+  IconAttachment,
+  IconSend,
+  IconFile,
+  IconClose,
+  IconDelete,
+  IconEdit,
+  IconSearch,
+  IconExclamation,
+  IconMoreVertical,
+} from '@arco-design/web-vue/es/icon'
 import { Message, Modal, Form } from '@arco-design/web-vue'
 import { useRoute, useRouter } from 'vue-router'
 import MarkdownIt from 'markdown-it'
@@ -232,6 +260,7 @@ const feedbackForm = ref({
   issueDescription: ''
 })
 const feedbackFormRef = ref()
+const isSubmitting = ref(false)
 
 // 修改知识库列表的数据结构
 const knowledgeList = ref([])
@@ -239,22 +268,25 @@ const knowledgeList = ref([])
 // 获取知识库列表的方法
 const fetchKnowledgeList = async () => {
   try {
+    const userId = userStore.getUserId();
+    if (!userId) return;
+
     const response = await axios.get('/api/library/queryLibraryList', {
       params: {
-        userId: userStore.userId
+        userId: userId
       }
-    })
+    });
 
     if (response.data.code === '200') {
-      knowledgeList.value = response.data.data
+      knowledgeList.value = response.data.data;
     } else {
-      Message.error(response.data.msg || '获取知识库列表失败')
+      Message.error(response.data.msg || '获取知识库列表失败');
     }
   } catch (error) {
-    console.error('获取知识库列表失败:', error)
-    Message.error(error.response?.data?.msg || '获取知识库列表失败')
+    console.error('获取知识库列表失败:', error);
+    Message.error(error.response?.data?.msg || '获取知识库列表失败');
   }
-}
+};
 
 // 初始化 markdown-it
 const md = new MarkdownIt({
@@ -288,33 +320,36 @@ const renderMarkdown = (content) => {
 // 获取聊天历史记录
 const fetchChatHistory = async () => {
   try {
+    const userId = userStore.getUserId();
+    if (!userId) return;
+
     const response = await axios.get(`/api/chat/conversation-history`, {
       params: {
-        userId: userStore.userId
+        userId: userId
       }
-    })
+    });
 
-    console.log('获取到的会话列表响应:', response.data)
+    console.log('获取到的会话列表响应:', response.data);
 
     if (response.data.code === '200') {
-      const sessionList = response.data.data
+      const sessionList = response.data.data;
       if (Array.isArray(sessionList)) {
-        chatHistory.value = sessionList
+        chatHistory.value = sessionList;
         if (sessionList.length > 0 && !currentChat.value) {
-          switchChat(sessionList[0].memoryId)
+          switchChat(sessionList[0].memoryId);
         }
       } else {
-        console.error('返回数据格式错误:', sessionList)
-        Message.error('获取会话列表失败：数据格式错误')
+        console.error('返回数据格式错误:', sessionList);
+        Message.error('获取会话列表失败：数据格式错误');
       }
     } else {
-      Message.error(response.data.msg || '获取会话列表失败')
+      Message.error(response.data.msg || '获取会话列表失败');
     }
   } catch (error) {
-    console.error('获取聊天历史失败:', error)
-    Message.error(error.response?.data?.msg || '获取会话列表失败')
+    console.error('获取聊天历史失败:', error);
+    Message.error(error.response?.data?.msg || '获取会话列表失败');
   }
-}
+};
 
 // 获取对话历史消息
 const fetchChatMessages = async (memoryId) => {
@@ -371,42 +406,48 @@ watch(
 // 创建新对话
 const createNewChat = async () => {
   try {
-    const request = {
-      userId: userStore.userId
+    const userId = userStore.getUserId();
+    if (!userId) {
+      Message.error('用户未登录或用户ID无效');
+      return;
     }
 
-    console.log('发送创建会话请求，参数：', request)
+    const request = {
+      userId: userId
+    };
+
+    console.log('发送创建会话请求，参数：', request);
 
     const response = await axios.post('/api/chat/conversation-create', request, {
       headers: {
         'Content-Type': 'application/json',
         'Accept': 'application/json'
       }
-    })
+    });
 
-    console.log('创建会话响应：', response)
+    console.log('创建会话响应：', response);
 
     if (response.data.code === '200') {
-      const newSession = response.data.data
+      const newSession = response.data.data;
       if (newSession && newSession.memoryId) {
         chatHistory.value.unshift({
           memoryId: newSession.memoryId,
           title: newSession.title,
-          userId: userStore.userId
-        })
-        await switchChat(newSession.memoryId)
-        Message.success('创建成功')
+          userId: userId
+        });
+        await switchChat(newSession.memoryId);
+        Message.success('创建成功');
       } else {
-        throw new Error('返回数据格式错误')
+        throw new Error('返回数据格式错误');
       }
     } else {
-      Message.error(response.data.msg || '创建对话失败')
+      Message.error(response.data.msg || '创建对话失败');
     }
   } catch (error) {
-    console.error('创建对话失败，详细错误：', error.response || error)
-    Message.error(error.response?.data?.msg || '创建对话失败')
+    console.error('创建对话失败，详细错误：', error.response || error);
+    Message.error(error.response?.data?.msg || '创建对话失败');
   }
-}
+};
 
 // 文件上传配置
 const allowedFileTypes = [
@@ -499,36 +540,42 @@ const sendMessage = async () => {
   // 如果没有当前对话,先创建一个新对话
   if (!currentChat.value) {
     try {
-      const request = {
-        userId: userStore.userId
+      const userId = userStore.getUserId();
+      if (!userId) {
+        Message.error('用户未登录或用户ID无效');
+        return;
       }
+
+      const request = {
+        userId: userId
+      };
       const response = await axios.post('/api/chat/conversation-create', request, {
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json'
         }
-      })
+      });
 
       if (response.data.code === '200') {
-        const newSession = response.data.data
+        const newSession = response.data.data;
         if (newSession && newSession.memoryId) {
           chatHistory.value.unshift({
             memoryId: newSession.memoryId,
             title: newSession.title,
-            userId: userStore.userId
-          })
-          currentChat.value = newSession.memoryId
-          await router.push(`/chat/${newSession.memoryId}`)
+            userId: userId
+          });
+          currentChat.value = newSession.memoryId;
+          await router.push(`/chat/${newSession.memoryId}`);
         } else {
-          throw new Error('返回数据格式错误')
+          throw new Error('返回数据格式错误');
         }
       } else {
-        throw new Error(response.data.msg || '创建对话失败')
+        throw new Error(response.data.msg || '创建对话失败');
       }
     } catch (error) {
-      console.error('创建对话失败:', error)
-      Message.error(error.response?.data?.msg || '创建对话失败')
-      return
+      console.error('创建对话失败:', error);
+      Message.error(error.response?.data?.msg || '创建对话失败');
+      return;
     }
   }
 
@@ -562,7 +609,7 @@ const sendMessage = async () => {
 
     // 创建请求数据，添加知识库ID（如果已选择）
     const requestData = {
-      userId: userStore.userId,
+      userId: userStore.getUserId(),
       userMessage: userInput,
       fileId: currentFileId || null,
       isWebSearchRequest: isWebSearch.value,
@@ -746,37 +793,55 @@ const handleTitleUpdate = async (memoryId) => {
 
 // 处理反馈提交
 const handleSubmitFeedback = async () => {
-  const { validate } = feedbackFormRef.value
+  if (!feedbackFormRef.value || isSubmitting.value) return
+
   try {
-    await validate()
-    const response = await axios.post('/api/home/submit-issue', feedbackForm.value)
-    Message.success('反馈提交成功，我们会认真处理~')
-    if (response.data.code === '200') {
-      showFeedbackModal.value = false
-      // 重置表单
-      feedbackForm.value = {
-        title: '',
-        issueDescription: ''
+    // 表单验证
+    const validResult = await feedbackFormRef.value.validate()
+    // 如果验证通过，validResult 为 undefined
+    if (!validResult) {
+      // 验证通过，执行提交逻辑
+      isSubmitting.value = true
+      const response = await axios.post('/api/home/submitIssue', {
+        title: feedbackForm.value.title.trim(),
+        issueDescription: feedbackForm.value.issueDescription.trim()
+      })
+
+      if (response.data.code === '200') {
+        Message.success('反馈提交成功，我们会认真处理~')
+        showFeedbackModal.value = false
+        // 重置表单
+        feedbackForm.value = {
+          title: '',
+          issueDescription: ''
+        }
+        feedbackFormRef.value.resetFields()
+      } else {
+        throw new Error(response.data.msg || '提交失败')
       }
-    } else {
-      throw new Error(response.data.msg || '提交失败')
     }
   } catch (error) {
     if (error.name === 'FormValidateError') {
-      return
+      console.error('反馈表单验证失败:', error)
+      Message.error('请检查表单填写是否正确')
+    } else {
+      console.error('提交反馈失败:', error)
+      Message.error(error.response?.data?.msg || '提交失败')
     }
-    console.error('提交反馈失败:', error)
-    Message.error(error.response?.data?.msg || '提交失败')
+  } finally {
+    isSubmitting.value = false
   }
 }
 
 // 处理取消反馈
 const handleCancelFeedback = () => {
+  if (isSubmitting.value) return
   showFeedbackModal.value = false
   feedbackForm.value = {
     title: '',
     issueDescription: ''
   }
+  feedbackFormRef.value?.resetFields()
 }
 
 // 处理更多操作
@@ -1151,6 +1216,7 @@ onBeforeUnmount(() => {
   transition: all 0.3s ease;
   animation: fadeIn 0.3s ease;
   align-items: flex-start;
+  margin-bottom: 12px;
 }
 
 @keyframes fadeIn {
@@ -1175,66 +1241,96 @@ onBeforeUnmount(() => {
   max-width: 80%;
 }
 
-:deep(.arco-avatar) {
-  border-radius: 12px;
-  transition: all 0.3s ease;
+.avatar-container {
   flex-shrink: 0;
-  width: 40px !important;
-  height: 40px !important;
-  font-size: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background-color: var(--avatar-bg-color);
 }
 
-.message-content {
-  padding: 12px 16px;
-  border-radius: 12px;
-  word-break: break-word;
-  transition: all 0.3s ease;
-  position: relative;
-  font-size: 14px;
-  line-height: 1.6;
-  letter-spacing: 0.3px;
+.message-user .avatar-container {
+  --avatar-bg-color: #3370FF;
+}
+
+.message-bot .avatar-container {
+  --avatar-bg-color: #00B42A;
+}
+
+.avatar-container :deep(.arco-avatar) {
+  width: 40px !important;
+  height: 40px !important;
+  border-radius: 12px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  color: #FFFFFF !important;
+  background-color: transparent !important;
+}
+
+.avatar-container :deep(.arco-avatar-icon) {
+  color: #FFFFFF !important;
+  font-size: 20px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.avatar-container :deep(.arco-icon) {
+  color: #FFFFFF !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  font-size: 20px !important;
+}
+
+/* 亮色模式下的样式 */
+[arco-theme='light'] .avatar-container :deep(.arco-icon) {
+  color: #FFFFFF !important;
+}
+
+/* 暗色模式下的样式 */
+[arco-theme='dark'] .avatar-container :deep(.arco-icon) {
+  color: #FFFFFF !important;
 }
 
 /* 亮色模式下的样式 */
 [arco-theme='light'] .message-bot .message-content {
-  background: #ffffff;
-  color: var(--color-text-1);
-  border: 1px solid var(--color-border-2);
-  border-top-left-radius: 2px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  background-color: #FFFFFF !important;
+  color: var(--color-text-1) !important;
+  border: 1px solid #E5E6EB !important;
+  border-top-left-radius: 2px !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04) !important;
 }
 
 [arco-theme='light'] .message-user .message-content {
-  background: #165DFF;
-  color: #ffffff;
-  border-top-right-radius: 2px;
-  font-weight: 500;
-  box-shadow: 0 2px 8px rgba(22, 93, 255, 0.15);
+  background-color: #3370FF !important;
+  color: #FFFFFF !important;
+  border-top-right-radius: 2px !important;
+  font-weight: 500 !important;
+  box-shadow: 0 2px 8px rgba(51, 112, 255, 0.15) !important;
 }
 
 /* 暗色模式下的样式 */
 [arco-theme='dark'] .message-bot .message-content {
-  background: var(--color-bg-3);
-  color: var(--color-text-1);
-  border: 1px solid var(--color-border-3);
-  border-top-left-radius: 2px;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.2);
+  background-color: #232324 !important;
+  color: var(--color-text-1) !important;
+  border: 1px solid #333335 !important;
+  border-top-left-radius: 2px !important;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.2) !important;
 }
 
 [arco-theme='dark'] .message-user .message-content {
-  background: var(--color-primary-light-1);
-  color: #ffffff;
-  border-top-right-radius: 2px;
-  font-weight: 500;
-  box-shadow: 0 4px 16px rgba(var(--primary-light-1), 0.25);
-}
-
-.message-bot{
-  left: 0;
-}
-
-.message-user{
-  right: 0;
+  background-color: #3370FF !important;
+  color: #FFFFFF !important;
+  border-top-right-radius: 2px !important;
+  font-weight: 500 !important;
+  box-shadow: 0 4px 16px rgba(51, 112, 255, 0.25) !important;
 }
 
 /* 修改选择框文字颜色 */
@@ -1266,12 +1362,21 @@ onBeforeUnmount(() => {
   background: transparent;
   border-radius: 16px;
   padding: 12px 16px;
-  border: 1px solid rgba(0, 0, 0, 0.08);
   transition: all 0.3s ease;
   margin: 0;
   margin-left: 40px;
   max-width: calc(80% - 40px);
   box-shadow: none;
+}
+
+/* 亮色模式下的边框 */
+[arco-theme='light'] .input-wrapper {
+  border: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+/* 暗色模式下的边框 */
+[arco-theme='dark'] .input-wrapper {
+  border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 :deep(.arco-textarea-wrapper) {
@@ -1892,5 +1997,68 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   width: 100%;
+}
+
+/* 消息内容的公共样式 */
+.message-content {
+  padding: 12px 16px !important;
+  border-radius: 12px !important;
+  word-break: break-word !important;
+  transition: all 0.3s ease !important;
+  position: relative !important;
+  font-size: 14px !important;
+  line-height: 1.6 !important;
+  letter-spacing: 0.3px !important;
+}
+
+/* 默认气泡样式 */
+.message-bot .message-content {
+  background-color: #FFFFFF !important;
+  color: var(--color-text-1) !important;
+  border: 1px solid #E5E6EB !important;
+  border-top-left-radius: 2px !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04) !important;
+}
+
+.message-user .message-content {
+  background-color: #3370FF !important;
+  color: #FFFFFF !important;
+  border-top-right-radius: 2px !important;
+  font-weight: 500 !important;
+  box-shadow: 0 2px 8px rgba(51, 112, 255, 0.15) !important;
+}
+
+/* 亮色模式下的样式 */
+[arco-theme='light'] .message-bot .message-content {
+  background-color: #FFFFFF !important;
+  color: var(--color-text-1) !important;
+  border: 1px solid #E5E6EB !important;
+  border-top-left-radius: 2px !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04) !important;
+}
+
+[arco-theme='light'] .message-user .message-content {
+  background-color: #3370FF !important;
+  color: #FFFFFF !important;
+  border-top-right-radius: 2px !important;
+  font-weight: 500 !important;
+  box-shadow: 0 2px 8px rgba(51, 112, 255, 0.15) !important;
+}
+
+/* 暗色模式下的样式 */
+[arco-theme='dark'] .message-bot .message-content {
+  background-color: #232324 !important;
+  color: var(--color-text-1) !important;
+  border: 1px solid #333335 !important;
+  border-top-left-radius: 2px !important;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.2) !important;
+}
+
+[arco-theme='dark'] .message-user .message-content {
+  background-color: #3370FF !important;
+  color: #FFFFFF !important;
+  border-top-right-radius: 2px !important;
+  font-weight: 500 !important;
+  box-shadow: 0 4px 16px rgba(51, 112, 255, 0.25) !important;
 }
 </style>

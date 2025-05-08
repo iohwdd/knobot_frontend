@@ -1,5 +1,14 @@
 <script setup>
 import { RouterView } from 'vue-router'
+import { onMounted } from 'vue'
+import { useUserStore } from '@/stores/user'
+
+const userStore = useUserStore()
+
+onMounted(() => {
+  // 用户信息会通过 pinia-plugin-persistedstate 自动从本地存储恢复
+  console.log('用户状态初始化完成', userStore.isLoggedIn() ? '已登录' : '未登录')
+})
 </script>
 
 <template>
