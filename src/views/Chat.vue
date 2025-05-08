@@ -16,7 +16,7 @@
             >
               <div class="history-item-wrapper">
                 <div class="history-item" @click="switchChat(item.memoryId)">
-                  <icon-message />
+                  <icon-message class="history-icon" />
                   <div class="title-container">
                     <input
                       v-if="editingId === item.memoryId"
@@ -30,29 +30,25 @@
                     <span v-else class="history-title">{{ item.title }}</span>
                   </div>
                 </div>
-                <div class="button-group">
-                  <a-button
-                    type="text"
-                    size="mini"
-                    class="rename-btn"
-                    @click.stop="startEditing(item)"
-                  >
-                    <template #icon>
-                      <icon-edit />
-                    </template>
+                <a-dropdown @select="(key) => handleMoreActions(key, item)" :popup-max-height="false">
+                  <a-button class="more-btn" type="text" size="mini">
+                    <icon-more-vertical />
                   </a-button>
-                  <a-button
-                    type="text"
-                    size="mini"
-                    status="danger"
-                    class="delete-btn"
-                    @click.stop="handleDeleteChat(item.memoryId)"
-                  >
-                    <template #icon>
-                      <icon-delete />
-                    </template>
-                  </a-button>
-                </div>
+                  <template #content>
+                    <a-doption value="rename" class="dropdown-option">
+                      <div class="option-content">
+                        <icon-edit />
+                        <span>重命名</span>
+                      </div>
+                    </a-doption>
+                    <a-doption value="delete" class="dropdown-option danger-option">
+                      <div class="option-content">
+                        <icon-delete />
+                        <span>删除</span>
+                      </div>
+                    </a-doption>
+                  </template>
+                </a-dropdown>
               </div>
             </a-list-item>
           </transition-group>
@@ -195,16 +191,20 @@
 
 <script setup>
 import { ref, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
-import { IconPlus, IconMessage, IconUser, IconRobot, IconAttachment, IconSend, IconFile, IconClose, IconDelete, IconEdit, IconSearch, IconExclamation } from '@arco-design/web-vue/es/icon'
+import { IconPlus, IconMessage, IconUser, IconRobot, IconAttachment, IconSend, IconFile, IconClose, IconDelete, IconEdit, IconSearch, IconExclamation, IconMoreVertical } from '@arco-design/web-vue/es/icon'
 import { Message, Modal, Form } from '@arco-design/web-vue'
 import { useRoute, useRouter } from 'vue-router'
 import MarkdownIt from 'markdown-it'
 import hljs from 'highlight.js'
 import 'highlight.js/styles/github.css'
 import axios from 'axios'
+import { useLayoutStore } from '@/stores/layout'
+import { useUserStore } from '@/stores/user'
 
 const route = useRoute()
 const router = useRouter()
+const layoutStore = useLayoutStore()
+const userStore = useUserStore()
 
 const inputMessage = ref('')
 const messages = ref([])
@@ -213,9 +213,8 @@ const messageList = ref(null)
 const currentChat = ref(null)
 const isMobile = ref(window.innerWidth <= 768)
 const isReceiving = ref(false)
-const userId = ref('2')  // mock用户ID
 const chatHistory = ref([])
-const uploadedFiles = ref([]) // 暂存的文件列表
+const uploadedFiles = ref([])
 let eventSource = null
 
 // 添加重命名相关的状态
@@ -237,17 +236,16 @@ const feedbackFormRef = ref()
 // 修改知识库列表的数据结构
 const knowledgeList = ref([])
 
-// 添加获取知识库列表的方法
+// 获取知识库列表的方法
 const fetchKnowledgeList = async () => {
   try {
     const response = await axios.get('/api/library/queryLibraryList', {
       params: {
-        userId: userId.value
+        userId: userStore.userId
       }
     })
 
     if (response.data.code === '200') {
-      // 直接使用接口返回的数据，不需要映射
       knowledgeList.value = response.data.data
     } else {
       Message.error(response.data.msg || '获取知识库列表失败')
@@ -292,7 +290,7 @@ const fetchChatHistory = async () => {
   try {
     const response = await axios.get(`/api/chat/conversation-history`, {
       params: {
-        userId: userId.value
+        userId: userStore.userId
       }
     })
 
@@ -374,7 +372,7 @@ watch(
 const createNewChat = async () => {
   try {
     const request = {
-      userId: userId.value
+      userId: userStore.userId
     }
 
     console.log('发送创建会话请求，参数：', request)
@@ -391,13 +389,11 @@ const createNewChat = async () => {
     if (response.data.code === '200') {
       const newSession = response.data.data
       if (newSession && newSession.memoryId) {
-        // 将新会话添加到列表开头
         chatHistory.value.unshift({
           memoryId: newSession.memoryId,
           title: newSession.title,
-          userId: userId.value
+          userId: userStore.userId
         })
-        // 切换到新会话
         await switchChat(newSession.memoryId)
         Message.success('创建成功')
       } else {
@@ -496,11 +492,49 @@ const handleAttachmentClick = () => {
 
 // 修改发送消息的方法
 const sendMessage = async () => {
-  if (!inputMessage.value.trim() || isReceiving.value || !currentChat.value) {
-    if (!currentChat.value) {
-      Message.warning('请先创建或选择一个对话')
-    }
+  if (!inputMessage.value.trim() || isReceiving.value) {
     return
+  }
+
+  // 如果没有当前对话,先创建一个新对话
+  if (!currentChat.value) {
+    try {
+      const request = {
+        userId: userStore.userId
+      }
+      const response = await axios.post('/api/chat/conversation-create', request, {
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        }
+      })
+
+      if (response.data.code === '200') {
+        const newSession = response.data.data
+        if (newSession && newSession.memoryId) {
+          chatHistory.value.unshift({
+            memoryId: newSession.memoryId,
+            title: newSession.title,
+            userId: userStore.userId
+          })
+          currentChat.value = newSession.memoryId
+          await router.push(`/chat/${newSession.memoryId}`)
+        } else {
+          throw new Error('返回数据格式错误')
+        }
+      } else {
+        throw new Error(response.data.msg || '创建对话失败')
+      }
+    } catch (error) {
+      console.error('创建对话失败:', error)
+      Message.error(error.response?.data?.msg || '创建对话失败')
+      return
+    }
+  }
+
+  // 发送消息时自动收起导航栏
+  if (!isMobile.value) {
+    layoutStore.setCollapsed(true)
   }
 
   // 添加用户消息
@@ -528,7 +562,7 @@ const sendMessage = async () => {
 
     // 创建请求数据，添加知识库ID（如果已选择）
     const requestData = {
-      userId: userId.value,
+      userId: userStore.userId,
       userMessage: userInput,
       fileId: currentFileId || null,
       isWebSearchRequest: isWebSearch.value,
@@ -745,6 +779,18 @@ const handleCancelFeedback = () => {
   }
 }
 
+// 处理更多操作
+const handleMoreActions = (key, item) => {
+  switch (key) {
+    case 'rename':
+      startEditing(item)
+      break
+    case 'delete':
+      handleDeleteChat(item.memoryId)
+      break
+  }
+}
+
 onMounted(async () => {
   window.addEventListener('resize', handleResize)
   // 获取知识库列表
@@ -780,7 +826,7 @@ onBeforeUnmount(() => {
 }
 
 .chat-sidebar {
-  width: 260px;
+  width: 320px;  /* 调整宽度从260px到320px */
   height: 100%;
   padding: 20px;
   border-right: 1px solid var(--color-border);
@@ -803,19 +849,26 @@ onBeforeUnmount(() => {
   align-items: center;
   justify-content: space-between;
   width: 100%;
-  padding: 8px 12px;
+  padding: 12px 16px;  /* 增加内边距 */
   border-radius: 6px;
   margin: 4px 8px;
   transition: all 0.3s ease;
+  min-height: 52px;  /* 设置最小高度 */
 }
 
 .history-item {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;  /* 增加图标和文字的间距 */
   flex: 1;
   min-width: 0;
   cursor: pointer;
+  padding-right: 8px;
+}
+
+.history-icon {
+  font-size: 20px;  /* 增加图标大小 */
+  flex-shrink: 0;
 }
 
 .title-container {
@@ -992,11 +1045,13 @@ onBeforeUnmount(() => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 14px;
+  font-size: 15px;  /* 增加字体大小 */
+  line-height: 1.4;  /* 调整行高 */
   padding: 2px 8px;
   margin: -3px 0;
   border: 1px solid transparent;
   color: inherit;
+  max-width: 240px;
 }
 
 .delete-btn {
@@ -1337,7 +1392,7 @@ onBeforeUnmount(() => {
 @media screen and (max-width: 768px) {
   .chat-sidebar {
     position: fixed;
-    left: -260px;
+    left: -320px;  /* 调整宽度从-260px到-320px */
     top: 0;
     bottom: 0;
     z-index: 1000;
@@ -1768,5 +1823,74 @@ onBeforeUnmount(() => {
 
 [arco-theme='dark'] .feedback-footer {
   border-color: var(--color-neutral-3);
+}
+
+.more-btn {
+  opacity: 0;
+  width: 32px !important;  /* 增加按钮宽度 */
+  height: 32px !important;  /* 增加按钮高度 */
+  padding: 0 !important;
+  border: none !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border-radius: 4px !important;
+  transition: all 0.3s ease !important;
+  background: transparent !important;
+  color: var(--color-text-3) !important;
+}
+
+.more-btn:hover {
+  background: var(--color-fill-2) !important;
+  color: rgb(var(--primary-6)) !important;
+}
+
+.history-item-wrapper:hover .more-btn {
+  opacity: 1;
+}
+
+/* 激活状态下的更多按钮样式 */
+.active .more-btn {
+  opacity: 1;
+  color: rgba(255, 255, 255, 0.85) !important;
+}
+
+.active .more-btn:hover {
+  color: #fff !important;
+  background: rgba(255, 255, 255, 0.15) !important;
+}
+
+/* 下拉菜单中的危险操作样式 */
+:deep(.danger-option) {
+  color: rgb(var(--danger-6)) !important;
+}
+
+:deep(.danger-option:hover) {
+  background-color: var(--color-danger-light-1) !important;
+}
+
+/* 下拉菜单选项样式 */
+:deep(.dropdown-option) {
+  padding: 8px 12px !important;
+  min-height: 40px !important;
+}
+
+.option-content {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+}
+
+.option-content :deep(.arco-icon) {
+  font-size: 16px;
+  flex-shrink: 0;
+}
+
+/* 确保下拉菜单选项内容对齐 */
+:deep(.arco-dropdown-option-content) {
+  display: flex;
+  align-items: center;
+  width: 100%;
 }
 </style>

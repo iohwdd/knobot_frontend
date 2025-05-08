@@ -355,47 +355,49 @@ const handleFileUpload = (option) => {
 }
 
 const handleUploadConfirm = async (done) => {
+  if (!uploadFormRef.value) return done(false)
+
   try {
-    // 1. 表单验证
-    await uploadFormRef.value.validate()
+    // 表单验证
+    const validResult = await uploadFormRef.value.validate()
+    // 如果验证通过，validResult 为 undefined
+    if (!validResult) {
+      // 2. 构建 FormData
+      const formData = new FormData()
+      // 添加 JSON 数据，使用 requestBody 作为参数名
+      formData.append('knowledgeLibId', route.params.id)
+      formData.append('documentName', uploadForm.value.name)
+      formData.append('documentDesc', uploadForm.value.description)
+      // 添加文件
+      formData.append('file', uploadForm.value.file)
 
-    // 2. 构建 FormData
-    const formData = new FormData()
-    // 添加 JSON 数据，使用 requestBody 作为参数名
-    formData.append('knowledgeLibId', route.params.id)
-    formData.append('documentName', uploadForm.value.name)
-    formData.append('documentDesc', uploadForm.value.description)
-    // 添加文件
-    formData.append('file', uploadForm.value.file)
+      // 3. 发送请求
+      const response = await axios.post('/api/library/createKnowledgeLibDocument', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
+      })
 
-    // 3. 发送请求
-    const response = await axios.post('/api/library/createKnowledgeLibDocument', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data'
+      // 4. 处理响应
+      if (response.data.code === '200') {
+        Message.success('文档上传成功')
+        // 重置表单
+        resetUploadForm()
+        // 刷新文档列表
+        await fetchDocumentList()
+        // 关闭模态框
+        uploadModalVisible.value = false
+        done(true)
+      } else {
+        throw new Error(response.data.msg || '上传失败')
       }
-    })
-
-    // 4. 处理响应
-    if (response.data.code === '200') {
-      Message.success('文档上传成功')
-      // 重置表单
-      resetUploadForm()
-      // 刷新文档列表
-      await fetchDocumentList()
-      // 关闭模态框
-      uploadModalVisible.value = false
-      return true
     } else {
-      throw new Error(response.data.msg || '上传失败')
+      done(false)
     }
   } catch (error) {
     console.error('上传失败:', error)
-    if (error.name === 'FormValidationError') {
-      Message.warning('请检查表单填写是否正确')
-    } else {
-      Message.error(error.message || '上传失败')
-    }
-    return false
+    Message.error(error.message || '上传失败')
+    done(false)
   }
 }
 
@@ -478,47 +480,49 @@ const removeEditFile = () => {
 }
 
 const handleEditConfirm = async (done) => {
+  if (!editFormRef.value) return done(false)
+
   try {
-    // 1. 表单验证
-    await editFormRef.value.validate()
-
-    // 2. 构建 FormData
-    const formData = new FormData()
-    formData.append('documentId', editForm.value.documentId)
-    formData.append('documentName', editForm.value.name)
-    formData.append('documentDesc', editForm.value.description)
-    if (editForm.value.file) {
-      formData.append('file', editForm.value.file)
-    }
-
-    // 3. 发送请求
-    const response = await axios.post('/api/library/updateKnowledgeLibDocument', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data'
+    // 表单验证
+    const validResult = await editFormRef.value.validate()
+    // 如果验证通过，validResult 为 undefined
+    if (!validResult) {
+      // 2. 构建 FormData
+      const formData = new FormData()
+      formData.append('documentId', editForm.value.documentId)
+      formData.append('documentName', editForm.value.name)
+      formData.append('documentDesc', editForm.value.description)
+      if (editForm.value.file) {
+        formData.append('file', editForm.value.file)
       }
-    })
 
-    // 4. 处理响应
-    if (response.data.code === '200') {
-      Message.success('文档更新成功')
-      // 重置表单
-      resetEditForm()
-      // 刷新文档列表
-      await fetchDocumentList()
-      // 关闭模态框
-      editModalVisible.value = false
-      return true
+      // 3. 发送请求
+      const response = await axios.post('/api/library/updateKnowledgeLibDocument', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
+      })
+
+      // 4. 处理响应
+      if (response.data.code === '200') {
+        Message.success('文档更新成功')
+        // 重置表单
+        resetEditForm()
+        // 刷新文档列表
+        await fetchDocumentList()
+        // 关闭模态框
+        editModalVisible.value = false
+        done(true)
+      } else {
+        throw new Error(response.data.msg || '更新失败')
+      }
     } else {
-      throw new Error(response.data.msg || '更新失败')
+      done(false)
     }
   } catch (error) {
     console.error('更新失败:', error)
-    if (error.name === 'FormValidationError') {
-      Message.warning('请检查表单填写是否正确')
-    } else {
-      Message.error(error.message || '更新失败')
-    }
-    return false
+    Message.error(error.message || '更新失败')
+    done(false)
   }
 }
 

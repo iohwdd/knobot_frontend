@@ -22,14 +22,9 @@
           <a-button type="text" size="small" @click="editKnowledge(record)">
             编辑
           </a-button>
-          <a-popconfirm
-            content="确定要删除这个知识库吗？"
-            @ok="deleteKnowledge(record.knowledgeLibId)"
-          >
-            <a-button type="text" size="small" status="danger">
-              删除
-            </a-button>
-          </a-popconfirm>
+          <a-button type="text" size="small" status="danger" @click="showDeleteConfirm(record)">
+            删除
+          </a-button>
         </a-space>
       </template>
     </a-table>
@@ -85,10 +80,10 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { Message } from '@arco-design/web-vue'
+import { Message, Modal } from '@arco-design/web-vue'
 import { IconPlus } from '@arco-design/web-vue/es/icon'
 import axios from 'axios'
-import { useUserStore } from '../store/user'
+import { useUserStore } from '@/stores/user'
 
 const router = useRouter()
 const userStore = useUserStore()
@@ -142,21 +137,40 @@ const fetchKnowledgeList = async () => {
   try {
     const response = await axios.get('/api/library/queryLibraryDetailList', {
       params: {
-        userId: userStore.getUserId
+        userId: userStore.userId
       }
     })
 
+    console.log('获取到的知识库列表响应:', response.data)
+
     if (response.data.code === '200') {
       // 处理返回的数据，格式化时间
-      knowledgeList.value = response.data.data.map(item => ({
-        ...item,
-        createTime: new Date(item.createTime).toLocaleString()
+      // 确保 response.data.data 存在，如果为空则使用空数组
+      const libraryList = response.data.data || []
+      knowledgeList.value = libraryList.map(item => ({
+        knowledgeLibId: item.knowledgeLibId,
+        knowledgeLibName: item.knowledgeLibName,
+        knowledgeLibDesc: item.knowledgeLibDesc,
+        documentCount: item.documentCount || 0,
+        createTime: item.createTime ? new Date(item.createTime.replace('T', ' ')).toLocaleString('zh-CN', {
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit',
+          hour12: false
+        }) : '-'
       }))
     } else {
+      // 如果请求失败，设置为空数组
+      knowledgeList.value = []
       Message.error(response.data.msg || '获取知识库列表失败')
     }
   } catch (error) {
     console.error('获取知识库列表失败:', error)
+    // 发生错误时，也设置为空数组
+    knowledgeList.value = []
     Message.error('获取知识库列表失败')
   }
 }
@@ -177,28 +191,46 @@ const showCreateModal = () => {
 }
 
 const handleCreateConfirm = async (done) => {
-  try {
-    // 1. 先进行表单验证
-    await formRef.value.validate()
+  if (!formRef.value) return done(false)
 
-    // 2. 发送请求
-    let response
+  try {
+    // 表单验证
+    const validResult = await formRef.value.validate()
+    // 如果验证通过，validResult 为 undefined
+    if (!validResult) {
+      // 验证通过，执行后续请求逻辑
+      await submitForm(done)
+    } else {
+      done(false)
+    }
+  } catch (errors) {
+    // 验证失败
+    console.error('表单验证失败:', errors)
+    Message.error('请检查表单填写是否正确')
+    done(false)
+  }
+}
+
+// 表单提交逻辑，只有在验证通过后才会调用
+const submitForm = async (done) => {
+  try {
+    let response;
     if (isEdit.value) {
       response = await axios.post('/api/library/updateKnowledgeLib', {
         knowledgeLibId: formData.value.knowledgeLibId,
-        knowledgeLibName: formData.value.name,
-        knowledgeLibDesc: formData.value.description,
-        userId: userStore.getUserId
+        knowledgeLibName: formData.value.name.trim(),
+        knowledgeLibDesc: formData.value.description.trim(),
+        userId: userStore.userId
       })
     } else {
       response = await axios.post('/api/library/createKnowledgeLib', {
-        knowledgeLibName: formData.value.name,
-        knowledgeLibDesc: formData.value.description,
-        userId: userStore.getUserId
+        knowledgeLibName: formData.value.name.trim(),
+        knowledgeLibDesc: formData.value.description.trim(),
+        userId: userStore.userId
       })
     }
 
-    // 3. 处理响应
+    // 处理响应
     if (response.data.code === '200') {
       Message.success(isEdit.value ? '更新成功' : '创建成功')
       // 刷新知识库列表
@@ -211,15 +243,8 @@ const handleCreateConfirm = async (done) => {
       done(false)
     }
   } catch (error) {
-    // 4. 错误处理
-    if (error.name === 'FormValidationError') {
-      // 表单验证错误
-      Message.error('请检查表单填写是否正确')
-    } else {
-      // API 请求错误
-      console.error('操作失败:', error)
-      Message.error(error.response?.data?.msg || (isEdit.value ? '更新失败' : '创建失败'))
-    }
+    console.error('请求失败:', error)
+    Message.error(error.response?.data?.msg || (isEdit.value ? '更新失败' : '创建失败'))
     done(false)
   }
 }
@@ -257,8 +282,37 @@ const editKnowledge = (record) => {
 }
 
 const deleteKnowledge = async (knowledgeLibId) => {
-  // 实现删除知识库逻辑
-  Message.success('删除成功')
+  try {
+    const response = await axios.post('/api/library/deleteKnowledgeLib', {
+      knowledgeLibId
+    })
+
+    if (response.data.code === '200') {
+      Message.success('删除成功')
+      // 刷新知识库列表
+      await fetchKnowledgeList()
+    } else {
+      throw new Error(response.data.msg || '删除失败')
+    }
+  } catch (error) {
+    console.error('删除知识库失败:', error)
+    Message.error(error.response?.data?.msg || '删除失败')
+  }
+}
+
+const showDeleteConfirm = (record) => {
+  Modal.confirm({
+    title: '确认删除知识库',
+    content: `确定要删除知识库"${record.knowledgeLibName}"吗？\n删除后将同时删除该知识库中的所有文档，此操作不可恢复。`,
+    okText: '删除',
+    cancelText: '取消',
+    okButtonProps: {
+      status: 'danger'
+    },
+    onOk: () => {
+      return deleteKnowledge(record.knowledgeLibId)
+    }
+  })
 }
 </script>
 

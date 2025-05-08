@@ -10,10 +10,13 @@
   },
   "dependencies": {
     "@arco-design/web-vue": "^2.57.0",
+    "@idux/cdk": "^2.6.3",
+    "@idux/components": "^2.6.3",
     "axios": "^1.8.4",
     "highlight.js": "^11.11.1",
     "markdown-it": "^14.1.0",
     "pinia": "^3.0.2",
+    "pinia-plugin-persistedstate": "^4.2.0",
     "vue": "^3.5.13",
     "vue-router": "4"
   },

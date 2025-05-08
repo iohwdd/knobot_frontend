@@ -4,14 +4,14 @@
       <!-- 侧边栏 -->
       <a-layout-sider
         class="layout-sider"
-        :collapsed="collapsed"
+        :collapsed="layoutStore.collapsed"
         :collapsible="true"
         :breakpoint="'xl'"
         @collapse="handleCollapse"
         :width="260"
       >
         <div class="logo">
-          <img src="../assets/logo.png" alt="logo" v-if="!collapsed" />
+          <img src="../assets/logo.png" alt="logo" v-if="!layoutStore.collapsed" />
           <img src="../assets/logo-small.png" alt="logo" v-else />
         </div>
         <a-menu
@@ -29,12 +29,12 @@
         </a-menu>
       </a-layout-sider>
 
-      <a-layout class="main-container" :class="{ 'main-container-collapsed': collapsed }">
+      <a-layout class="main-container" :class="{ 'main-container-collapsed': layoutStore.collapsed }">
         <!-- 顶部导航 -->
         <a-layout-header class="layout-header">
           <div class="header-left">
             <a-button class="collapse-btn" @click="toggleCollapse">
-              <icon-menu-fold v-if="!collapsed" />
+              <icon-menu-fold v-if="!layoutStore.collapsed" />
               <icon-menu-unfold v-else />
             </a-button>
           </div>
@@ -48,13 +48,35 @@
               <template #checked><icon-moon /></template>
               <template #unchecked><icon-sun /></template>
             </a-switch>
-            <a-dropdown>
-              <a-avatar :style="{ backgroundColor: '#3370ff' }">
-                <icon-user />
+
+            <!-- 未登录状态 -->
+            <a-button
+              v-if="!userStore.isLoggedIn()"
+              type="outline"
+              @click="showLoginModal"
+            >
+              登录
+            </a-button>
+
+            <!-- 已登录状态 -->
+            <a-dropdown v-else>
+              <a-avatar
+                :style="{
+                  backgroundColor: '#3370ff',
+                  borderRadius: '8px'
+                }"
+                :size="32"
+              >
+                <template v-if="userStore.userInfo?.avatarUrl">
+                  <img :src="userStore.userInfo.avatarUrl" />
+                </template>
+                <template v-else>
+                  <icon-user />
+                </template>
               </a-avatar>
               <template #content>
-                <a-doption>设置</a-doption>
-                <a-doption>退出</a-doption>
+                <a-doption @click="router.push('/space')">我的空间</a-doption>
+                <a-doption @click="handleLogout">退出登录</a-doption>
               </template>
             </a-dropdown>
           </div>
@@ -66,12 +88,19 @@
         </a-layout-content>
       </a-layout>
     </a-layout>
+    <LoginModal
+      v-model:visible="showLogin"
+      @login-success="handleLoginSuccess"
+    />
   </div>
 </template>
 
 <script setup>
 import { ref, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { useLayoutStore } from '@/stores/layout'
+import { useUserStore } from '@/stores/user'
+import { Message } from '@arco-design/web-vue'
 import {
   IconMessage,
   IconBook,
@@ -82,11 +111,14 @@ import {
   IconUser
 } from '@arco-design/web-vue/es/icon'
 import WeatherWidget from '@/components/WeatherWidget.vue'
+import LoginModal from '@/components/LoginModal.vue'
 
 const route = useRoute()
 const router = useRouter()
-const collapsed = ref(false)
+const layoutStore = useLayoutStore()
+const userStore = useUserStore()
 const isDark = ref(false)
+const showLogin = ref(false)
 
 const selectedKeys = computed(() => {
   const path = route.path
@@ -94,11 +126,11 @@ const selectedKeys = computed(() => {
 })
 
 const handleCollapse = (val) => {
-  collapsed.value = val
+  layoutStore.setCollapsed(val)
 }
 
 const toggleCollapse = () => {
-  collapsed.value = !collapsed.value
+  layoutStore.toggleCollapsed()
 }
 
 const toggleTheme = (checked) => {
@@ -114,6 +146,21 @@ const toggleTheme = (checked) => {
 watch(isDark, (newVal) => {
   document.documentElement.style.colorScheme = newVal ? 'dark' : 'light'
 })
+
+const showLoginModal = () => {
+  showLogin.value = true
+}
+
+const handleLogout = () => {
+  userStore.clearUserInfo()
+  Message.success('已退出登录')
+  router.push('/chat')
+}
+
+const handleLoginSuccess = () => {
+  showLogin.value = false
+  router.push('/chat')
+}
 </script>
 
 <style scoped>
@@ -242,12 +289,18 @@ watch(isDark, (newVal) => {
 }
 
 :deep(.arco-avatar) {
-  border-radius: 12px;
-  transition: all 0.3s ease;
+  cursor: pointer;
+  transition: transform 0.2s;
+  border-radius: 8px !important;
 }
 
-:deep(.arco-avatar:hover) {
-  transform: scale(1.05);
+:deep(.arco-avatar .arco-icon) {
+  font-size: 16px;
+}
+
+:deep(.arco-avatar img) {
+  border-radius: 8px;
+  object-fit: cover;
 }
 
 :deep(.arco-menu-item) {

@@ -28,6 +28,15 @@ const routes = [
         path: '/knowledge/:id',
         name: 'KnowledgeDetail',
         component: () => import('../views/KnowledgeDetail.vue')
+      },
+      {
+        path: '/space',
+        name: 'Space',
+        component: () => import('../views/Space.vue'),
+        meta: {
+          requiresAuth: true,
+          title: '我的空间'
+        }
       }
     ]
   }
