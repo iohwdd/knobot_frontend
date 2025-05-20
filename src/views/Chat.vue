@@ -225,7 +225,7 @@ import { useRoute, useRouter } from 'vue-router'
 import MarkdownIt from 'markdown-it'
 import hljs from 'highlight.js'
 import 'highlight.js/styles/github.css'
-import axios from 'axios'
+import request from '@/utils/request'
 import { useLayoutStore } from '@/stores/layout'
 import { useUserStore } from '@/stores/user'
 
@@ -271,13 +271,13 @@ const fetchKnowledgeList = async () => {
     const userId = userStore.getUserId();
     if (!userId) return;
 
-    const response = await axios.get('/api/library/queryLibraryList', {
+    const response = await request.get('/api/library/queryLibraryList', {
       params: {
         userId: userId
       }
     });
 
-    if (response.data.code === '200') {
+    if (response.data.code === 200) {
       knowledgeList.value = response.data.data;
     } else {
       Message.error(response.data.msg || '获取知识库列表失败');
@@ -323,7 +323,7 @@ const fetchChatHistory = async () => {
     const userId = userStore.getUserId();
     if (!userId) return;
 
-    const response = await axios.get(`/api/chat/conversation-history`, {
+    const response = await request.get(`/api/chat/conversation-history`, {
       params: {
         userId: userId
       }
@@ -331,7 +331,7 @@ const fetchChatHistory = async () => {
 
     console.log('获取到的会话列表响应:', response.data);
 
-    if (response.data.code === '200') {
+    if (response.data.code === 200) {
       const sessionList = response.data.data;
       if (Array.isArray(sessionList)) {
         chatHistory.value = sessionList;
@@ -354,13 +354,13 @@ const fetchChatHistory = async () => {
 // 获取对话历史消息
 const fetchChatMessages = async (memoryId) => {
   try {
-    const response = await axios.get(`/api/chat/messages`, {
+    const response = await request.get(`/api/chat/messages`, {
       params: {
         memoryId
       }
     })
 
-    if (response.data.code === '200') {
+    if (response.data.code === 200) {
       const messageList = response.data.data
       if (Array.isArray(messageList)) {
         messages.value = messageList.map(msg => ({
@@ -403,8 +403,25 @@ watch(
   }
 )
 
+// 检查用户登录状态
+const checkLoginStatus = () => {
+  if (!userStore.isLoggedIn()) {
+    Message.error('请先登录')
+    // 延迟执行路由跳转，确保消息显示完毕
+    setTimeout(() => {
+      // 直接路由到带有showLogin参数的首页
+      router.push('/?showLogin=true')
+    }, 200)
+    return false
+  }
+  return true
+}
+
 // 创建新对话
 const createNewChat = async () => {
+  // 检查用户登录状态
+  if (!checkLoginStatus()) return
+
   try {
     const userId = userStore.getUserId();
     if (!userId) {
@@ -412,22 +429,17 @@ const createNewChat = async () => {
       return;
     }
 
-    const request = {
+    const request_data = {
       userId: userId
     };
 
-    console.log('发送创建会话请求，参数：', request);
+    console.log('发送创建会话请求，参数：', request_data);
 
-    const response = await axios.post('/api/chat/conversation-create', request, {
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
-      }
-    });
+    const response = await request.post('/api/chat/conversation-create', request_data);
 
     console.log('创建会话响应：', response);
 
-    if (response.data.code === '200') {
+    if (response.data.code === 200) {
       const newSession = response.data.data;
       if (newSession && newSession.memoryId) {
         chatHistory.value.unshift({
@@ -469,6 +481,12 @@ const removeUploadedFile = () => {
 
 // 修改文件上传处理方法
 const handleFileUpload = async (event) => {
+  // 检查用户登录状态
+  if (!checkLoginStatus()) {
+    event.target.value = ''
+    return
+  }
+
   const file = event.target.files[0]
   if (!file) return
 
@@ -490,15 +508,11 @@ const handleFileUpload = async (event) => {
 
     console.log('开始上传文件:', file.name)
     // 上传文件
-    const response = await axios.post('/api/chat/upload', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data'
-      }
-    })
+    const response = await request.post('/api/chat/upload', formData)
 
     console.log('文件上传响应:', response.data)
 
-    if (response.data.code === '200') {
+    if (response.data.code === 200) {
       const fileId = response.data.data.fileId
       console.log('文件上传成功，获取到的fileId:', fileId)
 
@@ -523,6 +537,9 @@ const handleFileUpload = async (event) => {
 
 // 处理附件按钮点击
 const handleAttachmentClick = () => {
+  // 检查用户登录状态
+  if (!checkLoginStatus()) return
+
   if (!currentChat.value) {
     Message.warning('请先创建或选择一个对话')
     return
@@ -533,6 +550,9 @@ const handleAttachmentClick = () => {
 
 // 修改发送消息的方法
 const sendMessage = async () => {
+  // 检查用户登录状态
+  if (!checkLoginStatus()) return
+
   if (!inputMessage.value.trim() || isReceiving.value) {
     return
   }
@@ -549,14 +569,9 @@ const sendMessage = async () => {
       const request = {
         userId: userId
       };
-      const response = await axios.post('/api/chat/conversation-create', request, {
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        }
-      });
+      const response = await request.post('/api/chat/conversation-create', request);
 
-      if (response.data.code === '200') {
+      if (response.data.code === 200) {
         const newSession = response.data.data;
         if (newSession && newSession.memoryId) {
           chatHistory.value.unshift({
@@ -716,15 +731,11 @@ const handleDeleteChat = async (memoryId) => {
       return
     }
 
-    const response = await axios.post('/api/chat/conversation-delete', {
+    const response = await request.post('/api/chat/conversation-delete', {
       memoryId
-    }, {
-      headers: {
-        'Content-Type': 'application/json'
-      }
-    })
+    });
 
-    if (response.data.code === '200') {
+    if (response.data.code === 200) {
       // 从列表中移除被删除的对话
       chatHistory.value = chatHistory.value.filter(item => item.memoryId !== memoryId)
       Message.success('删除成功')
@@ -768,12 +779,12 @@ const handleTitleUpdate = async (memoryId) => {
   }
 
   try {
-    const response = await axios.post('/api/chat/conversation-title-update', {
+    const response = await request.post('/api/chat/conversation-title-update', {
       memoryId,
       newTitle: editingTitle.value.trim()
-    })
+    });
 
-    if (response.data.code === '200') {
+    if (response.data.code === 200) {
       // 更新本地数据
       const chatItem = chatHistory.value.find(item => item.memoryId === memoryId)
       if (chatItem) {
@@ -802,12 +813,12 @@ const handleSubmitFeedback = async () => {
     if (!validResult) {
       // 验证通过，执行提交逻辑
       isSubmitting.value = true
-      const response = await axios.post('/api/home/submitIssue', {
+      const response = await request.post('/api/home/submitIssue', {
         title: feedbackForm.value.title.trim(),
         issueDescription: feedbackForm.value.issueDescription.trim()
-      })
+      });
 
-      if (response.data.code === '200') {
+      if (response.data.code === 200) {
         Message.success('反馈提交成功，我们会认真处理~')
         showFeedbackModal.value = false
         // 重置表单
@@ -856,19 +867,44 @@ const handleMoreActions = (key, item) => {
   }
 }
 
+// 监听登录状态变化
+watch(
+  () => userStore.isLoggedIn(),
+  async (isLoggedIn) => {
+    console.log('登录状态变化:', isLoggedIn)
+    if (isLoggedIn) {
+      // 用户登录后，自动获取数据
+      console.log('用户已登录，获取聊天数据')
+      // 获取知识库列表
+      await fetchKnowledgeList()
+      // 获取聊天历史
+      await fetchChatHistory()
+
+      // 如果有历史记录，切换到第一个对话
+      if (chatHistory.value.length > 0) {
+        await switchChat(chatHistory.value[0].memoryId)
+      }
+    } else {
+      // 当用户退出登录时，清空聊天数据
+      chatHistory.value = []
+      messages.value = []
+      currentChat.value = null
+      uploadedFiles.value = []
+      selectedKnowledge.value = null
+      knowledgeList.value = []
+    }
+  },
+  { immediate: true } // 确保组件挂载时立即执行
+);
+
 onMounted(async () => {
   window.addEventListener('resize', handleResize)
-  // 获取知识库列表
-  await fetchKnowledgeList()
-  await fetchChatHistory()
 
-  // 如果路由中有 memoryId，则切换到对应对话
-  if (route.params.memoryId) {
+  // 数据加载已在登录状态监听中处理，这里不再重复
+  // 只处理路由参数中的memoryId
+  if (userStore.isLoggedIn() && route.params.memoryId) {
+    // 如果路由中有memoryId参数，则自动切换到该对话
     await switchChat(route.params.memoryId)
-  }
-  // 如果没有 memoryId 但有历史记录，则切换到第一个对话
-  else if (chatHistory.value.length > 0) {
-    await switchChat(chatHistory.value[0].memoryId)
   }
 })
 

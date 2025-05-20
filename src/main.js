@@ -7,6 +7,7 @@ import router from './router'
 import '@arco-design/web-vue/dist/arco.css'
 import 'highlight.js/styles/github.css'
 import 'highlight.js/styles/github-dark.css'
+import './utils/request'
 
 const app = createApp(App)
 const pinia = createPinia()

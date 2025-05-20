@@ -243,7 +243,8 @@ const submitLogin = async () => {
       body: JSON.stringify({
         username: loginForm.value.username,
         password: loginForm.value.password
-      })
+      }),
+      credentials: 'include' // 确保接收并保存返回的 cookie (accessToken 和 refreshToken)
     });
 
     // 获取响应文本并打印原始内容
@@ -264,7 +265,7 @@ const submitLogin = async () => {
     // 手动解析 JSON
     const result = JSON.parse(responseText);
 
-    if (result.code === '200') {
+    if (result.code === 200) {
       // 创建用户数据，使用原始提取的 userId 字符串
       const userData = {
         ...result.data
@@ -325,12 +326,13 @@ const submitRegister = async () => {
       body: JSON.stringify({
         username: registerForm.value.username,
         password: registerForm.value.password
-      })
+      }),
+      credentials: 'include' // 确保接收并保存返回的 cookie
     });
 
     const result = await response.json();
 
-    if (result.code === '200') {
+    if (result.code === 200) {
       Message.success('注册成功，请登录');
       activeTab.value = 'login';
       registerFormRef.value.resetFields();

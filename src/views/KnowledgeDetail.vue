@@ -98,7 +98,7 @@
           <a-textarea
             v-model="uploadForm.description"
             placeholder="请输入文档描述"
-            :maxLength="200"
+            :maxLength=200
             :show-word-limit="true"
             :auto-size="{ minRows: 3, maxRows: 5 }"
             allow-clear
@@ -177,7 +177,7 @@
           <a-textarea
             v-model="editForm.description"
             placeholder="请输入文档描述"
-            :maxLength="200"
+            :maxLength=200
             :show-word-limit="true"
             :auto-size="{ minRows: 3, maxRows: 5 }"
             allow-clear
@@ -379,7 +379,7 @@ const handleUploadConfirm = async (done) => {
       })
 
       // 4. 处理响应
-      if (response.data.code === '200') {
+      if (response.data.code === 200) {
         Message.success('文档上传成功')
         // 重置表单
         resetUploadForm()
@@ -428,7 +428,7 @@ const deleteDocument = async (documentId) => {
       documentId: documentId
     })
 
-    if (response.data.code === '200') {
+    if (response.data.code === 200) {
       Message.success('删除成功')
       // 刷新文档列表
       await fetchDocumentList()
@@ -504,7 +504,7 @@ const handleEditConfirm = async (done) => {
       })
 
       // 4. 处理响应
-      if (response.data.code === '200') {
+      if (response.data.code === 200) {
         Message.success('文档更新成功')
         // 重置表单
         resetEditForm()
@@ -551,7 +551,7 @@ const fetchDocumentList = async () => {
       }
     })
 
-    if (response.data.code === '200') {
+    if (response.data.code === 200) {
       // 处理时间格式，保持原有的documentId
       documentList.value = response.data.data.map(doc => ({
         ...doc, // 保留所有原始字段，包括documentId

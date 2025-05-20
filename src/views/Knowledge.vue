@@ -149,7 +149,7 @@ const fetchKnowledgeList = async () => {
 
     console.log('获取到的知识库列表响应:', response.data);
 
-    if (response.data.code === '200') {
+    if (response.data.code === 200) {
       // 处理返回的数据，格式化时间
       // 确保 response.data.data 存在，如果为空则使用空数组
       const libraryList = response.data.data || [];
@@ -244,7 +244,7 @@ const submitForm = async (done) => {
     }
 
     // 处理响应
-    if (response.data.code === '200') {
+    if (response.data.code === 200) {
       Message.success(isEdit.value ? '更新成功' : '创建成功');
       // 刷新知识库列表
       await fetchKnowledgeList();
@@ -300,7 +300,7 @@ const deleteKnowledge = async (knowledgeLibId) => {
       knowledgeLibId
     })
 
-    if (response.data.code === '200') {
+    if (response.data.code === 200) {
       Message.success('删除成功')
       // 刷新知识库列表
       await fetchKnowledgeList()

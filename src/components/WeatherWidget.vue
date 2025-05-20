@@ -644,8 +644,8 @@ const fetchWeatherData = async () => {
 
     const data = await response.json()
 
-    // API响应格式为 { code: "200", msg: null, data: WeatherData }
-    if (data.code === "200" && data.data) {
+    // API响应格式为 { code: 200, msg: null, data: WeatherData }
+    if (data.code === 200 && data.data) {
       weatherData.value = data.data
       console.log('Weather data received:', data.data)
     } else {

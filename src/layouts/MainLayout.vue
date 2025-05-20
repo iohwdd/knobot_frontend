@@ -178,6 +178,22 @@ watch(
   { immediate: true } // 立即执行一次监听
 );
 
+// 监听路由查询参数，自动显示登录框
+watch(
+  () => route.query.showLogin,
+  (newVal) => {
+    if (newVal === 'true') {
+      showLogin.value = true
+      // 清除URL中的showLogin参数
+      const { query } = route
+      const newQuery = { ...query }
+      delete newQuery.showLogin
+      router.replace({ query: newQuery })
+    }
+  },
+  { immediate: true } // 确保首次加载时也会触发
+);
+
 // 优化头像更新检查
 let intervalId = null;
 
@@ -204,12 +220,16 @@ const showLoginModal = () => {
 
 const handleLogout = () => {
   userStore.clearUserInfo()
+  // 清除聊天相关数据
+  localStorage.removeItem('chat-history')
+  localStorage.removeItem('current-chat')
   Message.success('已退出登录')
   router.push('/chat')
 }
 
 const handleLoginSuccess = () => {
   showLogin.value = false
+  // 登录成功后直接跳转到聊天页，触发聊天页的登录状态监听
   router.push('/chat')
 }
 

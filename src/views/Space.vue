@@ -208,7 +208,7 @@ import {
   IconFile,
   IconDelete
 } from '@arco-design/web-vue/es/icon'
-import axios from 'axios'
+import request from '@/utils/request'
 // 导入Image组件的样式
 import '@arco-design/web-vue/es/image/style/css'
 
@@ -256,11 +256,11 @@ const fetchUserDetailInfo = async () => {
     console.log('Space.vue - 发送获取用户详情请求参数:', requestData);
 
     // 发送请求
-    const response = await axios.post('/api/user-query/queryUserDetailInfo', requestData);
+    const response = await request.post('/api/user-query/queryUserDetailInfo', requestData);
 
     console.log('Space.vue - 用户详情响应:', response.data);
 
-    if (response.data.code === '200') {
+    if (response.data.code === 200) {
       // 保存用户详情数据
       userDetailInfo.value = response.data.data;
 
@@ -560,7 +560,7 @@ const sendEmailCode = async () => {
     console.log('userId类型:', typeof requestData.userId);
 
     // 发送请求
-    const response = await axios.post('/api/user/sendEmail', requestData);
+    const response = await request.post('/api/user/sendEmail', requestData);
 
     console.log('发送验证码响应:', response);
 
@@ -569,7 +569,7 @@ const sendEmailCode = async () => {
       throw new Error('服务器响应无效');
     }
 
-    if (response.data.code === '200') {
+    if (response.data.code === 200) {
       Message.success('验证码已发送，请查收');
       // 开始倒计时
       startCountDown();
@@ -637,7 +637,7 @@ const handleBindEmail = async () => {
     console.log('userId类型:', typeof requestData.userId);
 
     // 发送请求
-    const response = await axios.post('/api/user/bindEmail', requestData);
+    const response = await request.post('/api/user/bindEmail', requestData);
 
     console.log('绑定邮箱响应:', response);
 
@@ -646,7 +646,7 @@ const handleBindEmail = async () => {
       throw new Error('服务器响应无效');
     }
 
-    if (response.data.code === '200') {
+    if (response.data.code === 200) {
       Message.success('绑定成功');
       // 清空表单
       bindEmailForm.value = { email: '', code: '' };
@@ -770,9 +770,9 @@ const handleSaveProfile = async (done) => {
     }
 
     // 发送请求
-    const response = await axios.post('/api/user/modifyInfo', formData, {
+    const response = await request.post('/api/user/modifyInfo', formData, {
       headers: {
-        // Axios 会自动设置 multipart/form-data
+        // 会自动设置 multipart/form-data
       }
     });
 
@@ -782,7 +782,7 @@ const handleSaveProfile = async (done) => {
       throw new Error('服务器响应无效');
     }
 
-    if (response.data.code === '200') {
+    if (response.data.code === 200) {
       Message.success('保存成功');
 
       // 清理表单状态
