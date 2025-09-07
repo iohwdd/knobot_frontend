@@ -147,6 +147,7 @@ import { Message } from '@arco-design/web-vue'
 import { IconUser, IconLock } from '@arco-design/web-vue/es/icon'
 import type { FormInstance } from '@arco-design/web-vue'
 import { useUserStore } from '../stores/user'
+import request from '@/utils/request'
 
 const props = defineProps<{
   visible: boolean
@@ -235,65 +236,34 @@ const handleLogin = async () => {
 const submitLogin = async () => {
   try {
     loading.value = true;
-    const response = await fetch('/api/user/login', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        username: loginForm.value.username,
-        password: loginForm.value.password
-      }),
-      credentials: 'include' // 确保接收并保存返回的 cookie (accessToken 和 refreshToken)
+
+    // 使用axios进行登录请求
+    const response = await request.post('/api/user/login', {
+      username: loginForm.value.username,
+      password: loginForm.value.password
     });
 
-    // 获取响应文本并打印原始内容
-    const responseText = await response.text();
-    console.log('登录原始响应文本:', responseText);
+    if (response.data.code === 200) {
+      const userData = response.data.data;
 
-    // 使用特殊处理来保存原始的 userId 字符串
-    // 先用正则表达式找到 "userId":数字 这样的模式
-    const userIdMatch = responseText.match(/"userId"\s*:\s*(\d+)/);
-    let originalUserId = null;
-
-    if (userIdMatch && userIdMatch[1]) {
-      // 提取出原始的数字字符串
-      originalUserId = userIdMatch[1];
-      console.log('从响应中提取的原始 userId 字符串:', originalUserId);
-    }
-
-    // 手动解析 JSON
-    const result = JSON.parse(responseText);
-
-    if (result.code === 200) {
-      // 创建用户数据，使用原始提取的 userId 字符串
-      const userData = {
-        ...result.data
-      };
-
-      // 如果成功提取了原始 userId，使用它替换可能已经被转换的值
-      if (originalUserId) {
-        userData.userId = originalUserId;
-      } else if (result.data.userId) {
-        // 备用方案：确保 userId 是字符串
-        userData.userId = String(result.data.userId);
+      // 确保 userId 是字符串
+      if (userData.userId) {
+        userData.userId = String(userData.userId);
       }
 
-      console.log('处理后的用户数据:', userData);
-      console.log('最终使用的 userId:', userData.userId);
-      console.log('最终使用的 userId 类型:', typeof userData.userId);
-
+      console.log('登录成功，用户数据:', userData);
       userStore.setUserInfo(userData);
       Message.success('登录成功');
-      loginFormRef.value.resetFields();
+      loginFormRef.value?.resetFields();
       emit('update:visible', false);
       emit('login-success');
     } else {
-      Message.error(result.msg || '登录失败，请检查用户名和密码');
+      Message.error(response.data.msg || '登录失败，请检查用户名和密码');
     }
-  } catch (error) {
+  } catch (error: any) {
     console.log('登录请求失败:', error);
-    Message.error('登录失败，请稍后重试');
+    const errorMsg = error.response?.data?.msg || '登录失败，请稍后重试';
+    Message.error(errorMsg);
   } finally {
     loading.value = false;
   }

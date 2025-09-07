@@ -72,6 +72,7 @@
 
 <script setup>
 import { ref, onMounted, computed, reactive, watch } from 'vue'
+import { useUserStore } from '@/stores/user'
 import {
   Message,
   Modal,
@@ -92,6 +93,8 @@ import {
   IconExclamationCircle,
   IconLocation
 } from '@arco-design/web-vue/es/icon'
+
+const userStore = useUserStore()
 
 // 省市数据
 const provinceList = ref([
@@ -616,6 +619,12 @@ const displayLocation = computed(() => {
 
 // --- Weather Data Fetching ---
 const fetchWeatherData = async () => {
+  // 检查用户是否已登录
+  if (!userStore.isLoggedIn()) {
+    console.log('用户未登录，跳过天气数据获取')
+    return
+  }
+
   // 检查是否已设置有效的位置
   if (!locationForm.province || !locationForm.city) {
     Message.warning('请先设置有效的地区信息')

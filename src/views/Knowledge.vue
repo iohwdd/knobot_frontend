@@ -74,20 +74,28 @@
         </a-form-item>
       </a-form>
     </a-modal>
+
+    <!-- 登录弹窗 -->
+    <LoginModal
+      v-model:visible="showLoginModal"
+      @login-success="handleLoginSuccess"
+    />
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { Message, Modal } from '@arco-design/web-vue'
 import { IconPlus } from '@arco-design/web-vue/es/icon'
 import axios from 'axios'
 import { useUserStore } from '@/stores/user'
+import LoginModal from '@/components/LoginModal.vue'
 
 const router = useRouter()
 const userStore = useUserStore()
 const createModalVisible = ref(false)
+const showLoginModal = ref(false)
 const formRef = ref(null)
 const isEdit = ref(false)
 const formData = ref({
@@ -183,10 +191,47 @@ const fetchKnowledgeList = async () => {
 
 // 初始化获取知识库列表
 onMounted(() => {
-  fetchKnowledgeList()
+  // 检查登录状态
+  if (userStore.isLoggedIn()) {
+    fetchKnowledgeList()
+  } else {
+    // 未登录时弹出登录窗口并提示
+    Message.warning('请先登录后访问知识库')
+    showLoginModal.value = true
+  }
 })
 
+// 监听登录状态变化
+watch(
+  () => userStore.isLoggedIn(),
+  async (isLoggedIn) => {
+    console.log('Knowledge页面 - 登录状态变化:', isLoggedIn)
+    if (isLoggedIn) {
+      // 用户登录后，自动获取知识库列表
+      await fetchKnowledgeList()
+    } else {
+      // 当用户退出登录时，清空知识库列表
+      knowledgeList.value = []
+    }
+  }
+)
+
+// 处理登录成功
+const handleLoginSuccess = () => {
+  showLoginModal.value = false
+  Message.success('登录成功')
+  // 登录成功后自动获取知识库列表
+  fetchKnowledgeList()
+}
+
 const showCreateModal = () => {
+  // 检查登录状态
+  if (!userStore.isLoggedIn()) {
+    Message.warning('请先登录后创建知识库')
+    showLoginModal.value = true
+    return
+  }
+
   isEdit.value = false
   formData.value = {
     knowledgeLibId: null,
@@ -281,10 +326,23 @@ const handleCreateCancel = () => {
 }
 
 const goToDetail = (knowledgeLibId) => {
+  // 检查登录状态
+  if (!userStore.isLoggedIn()) {
+    Message.warning('请先登录后查看知识库详情')
+    showLoginModal.value = true
+    return
+  }
   router.push(`/knowledge/${knowledgeLibId}`)
 }
 
 const editKnowledge = (record) => {
+  // 检查登录状态
+  if (!userStore.isLoggedIn()) {
+    Message.warning('请先登录后编辑知识库')
+    showLoginModal.value = true
+    return
+  }
+
   isEdit.value = true
   formData.value = {
     knowledgeLibId: record.knowledgeLibId,
@@ -295,6 +353,13 @@ const editKnowledge = (record) => {
 }
 
 const deleteKnowledge = async (knowledgeLibId) => {
+  // 检查登录状态
+  if (!userStore.isLoggedIn()) {
+    Message.warning('请先登录后删除知识库')
+    showLoginModal.value = true
+    return
+  }
+
   try {
     const response = await axios.post('/api/library/deleteKnowledgeLib', {
       knowledgeLibId

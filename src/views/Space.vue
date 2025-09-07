@@ -17,7 +17,7 @@
           </div>
           <div class="user-info">
             <div class="nickname-row">
-              <h2>{{ userDetailInfo?.nickName || '未设置昵称' }}</h2>
+              <h2>{{ userDetailInfo?.nickname || '未设置昵称' }}</h2>
               <div class="username-container">
                 <span class="username-label">用户名：</span>
                 <span class="username-value">{{ userDetailInfo?.username || userStore.userInfo?.userName }}</span>
@@ -266,7 +266,7 @@ const fetchUserDetailInfo = async () => {
 
       // 记录关键字段，便于调试
       console.log('Space.vue - 用户详情数据:', {
-        nickName: userDetailInfo.value?.nickName,
+        nickname: userDetailInfo.value?.nickname,
         username: userDetailInfo.value?.username,
         description: userDetailInfo.value?.description,
         joinDays: userDetailInfo.value?.joinDays
@@ -276,7 +276,7 @@ const fetchUserDetailInfo = async () => {
       if (userDetailInfo.value) {
         editForm.value = {
           ...editForm.value,
-          nickname: userDetailInfo.value.nickName || '',
+          nickname: userDetailInfo.value.nickname || '',
           signature: userDetailInfo.value.description || '',
           // 用户名不可修改，仅展示
         };
@@ -292,8 +292,26 @@ const fetchUserDetailInfo = async () => {
 
 // 在组件挂载时获取用户详情
 onMounted(() => {
-  fetchUserDetailInfo()
+  // 只有在已登录状态下才获取用户详情
+  if (userStore.isLoggedIn()) {
+    fetchUserDetailInfo()
+  }
 })
+
+// 监听登录状态变化
+watch(
+  () => userStore.isLoggedIn(),
+  async (isLoggedIn) => {
+    console.log('Space页面 - 登录状态变化:', isLoggedIn)
+    if (isLoggedIn) {
+      // 用户登录后，自动获取用户详情
+      await fetchUserDetailInfo()
+    } else {
+      // 当用户退出登录时，清空用户详情数据
+      userDetailInfo.value = null
+    }
+  }
+)
 
 // 清除定时器
 onUnmounted(() => {
@@ -331,7 +349,7 @@ watch(() => userDetailInfo.value, (newValue) => {
     editForm.value = {
       ...editForm.value,
       avatarUrl: newValue.avatarUrl || '',
-      nickname: newValue.nickName || '',
+      nickname: newValue.nickname || '',
       signature: newValue.description || '',
       // 保留现有的密码字段和确认密码字段
       password: '',

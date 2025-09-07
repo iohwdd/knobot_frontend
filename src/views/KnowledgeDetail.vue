@@ -215,15 +215,26 @@
         </a-form-item>
       </a-form>
     </a-modal>
+
+    <!-- 登录弹窗 -->
+    <LoginModal
+      v-model:visible="showLoginModal"
+      @login-success="handleLoginSuccess"
+    />
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { Message } from '@arco-design/web-vue'
 import { IconLeft, IconUpload, IconFile, IconClose } from '@arco-design/web-vue/es/icon'
 import axios from 'axios'
+import { useUserStore } from '@/stores/user'
+import LoginModal from '@/components/LoginModal.vue'
+
+const userStore = useUserStore()
+const showLoginModal = ref(false)
 
 const router = useRouter()
 const route = useRoute()
@@ -309,6 +320,13 @@ const goBack = () => {
 }
 
 const showUploadModal = () => {
+  // 检查登录状态
+  if (!userStore.isLoggedIn()) {
+    Message.warning('请先登录后上传文档')
+    showLoginModal.value = true
+    return
+  }
+
   resetUploadForm()
   uploadModalVisible.value = true
 }
@@ -417,11 +435,25 @@ const resetUploadForm = () => {
 }
 
 const previewDocument = (document) => {
+  // 检查登录状态
+  if (!userStore.isLoggedIn()) {
+    Message.warning('请先登录后预览文档')
+    showLoginModal.value = true
+    return
+  }
+
   selectedDocument.value = document
   previewModalVisible.value = true
 }
 
 const deleteDocument = async (documentId) => {
+  // 检查登录状态
+  if (!userStore.isLoggedIn()) {
+    Message.warning('请先登录后删除文档')
+    showLoginModal.value = true
+    return
+  }
+
   try {
     const response = await axios.post('/api/library/deleteKnowledgeLibDocument', {
       knowledgeLibId: route.params.id,
@@ -567,10 +599,41 @@ const fetchDocumentList = async () => {
 }
 
 onMounted(() => {
-  // 获取知识库详情和文档列表
+  // 检查登录状态
+  if (userStore.isLoggedIn()) {
+    const id = route.params.id
+    fetchDocumentList()
+  } else {
+    // 未登录时弹出登录窗口并提示
+    Message.warning('请先登录后访问知识库详情')
+    showLoginModal.value = true
+  }
+})
+
+// 监听登录状态变化
+watch(
+  () => userStore.isLoggedIn(),
+  async (isLoggedIn) => {
+    console.log('KnowledgeDetail页面 - 登录状态变化:', isLoggedIn)
+    if (isLoggedIn) {
+      // 用户登录后，自动获取文档列表
+      const id = route.params.id
+      await fetchDocumentList()
+    } else {
+      // 当用户退出登录时，清空文档列表
+      documentList.value = []
+    }
+  }
+)
+
+// 处理登录成功
+const handleLoginSuccess = () => {
+  showLoginModal.value = false
+  Message.success('登录成功')
+  // 登录成功后自动获取文档列表
   const id = route.params.id
   fetchDocumentList()
-})
+}
 
 // 在组件卸载时清理
 onUnmounted(() => {

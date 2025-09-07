@@ -77,6 +77,70 @@
 
       <!-- 消息列表 -->
       <div class="message-list" ref="messageList">
+        <!-- 欢迎界面 - 仅在没有消息时显示 -->
+        <div v-if="messages.length === 0" class="welcome-container">
+          <div class="welcome-content">
+            <div class="welcome-header">
+              <div class="welcome-icon">
+                <icon-customer-service />
+              </div>
+              <div class="welcome-text">
+                <h2 class="welcome-title">你好！我是智能助手</h2>
+                <p class="welcome-subtitle">我可以帮您解答问题、处理文档，或进行网络搜索</p>
+              </div>
+            </div>
+
+            <div class="welcome-features">
+              <div class="feature-item">
+                <div class="feature-icon">
+                  <icon-message />
+                </div>
+                <div class="feature-text">
+                  <div class="feature-title">智能对话</div>
+                  <div class="feature-desc">支持多轮对话，理解上下文</div>
+                </div>
+              </div>
+
+              <div class="feature-item">
+                <div class="feature-icon">
+                  <icon-file />
+                </div>
+                <div class="feature-text">
+                  <div class="feature-title">文档分析</div>
+                  <div class="feature-desc">上传文档，快速获取内容摘要</div>
+                </div>
+              </div>
+
+              <div class="feature-item">
+                <div class="feature-icon">
+                  <icon-search />
+                </div>
+                <div class="feature-text">
+                  <div class="feature-title">网络搜索</div>
+                  <div class="feature-desc">实时搜索最新信息</div>
+                </div>
+              </div>
+
+              <div class="feature-item">
+                <div class="feature-icon">
+                  <icon-book />
+                </div>
+                <div class="feature-text">
+                  <div class="feature-title">知识库查询</div>
+                  <div class="feature-desc">基于您的知识库提供专业解答</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="welcome-tips">
+              <div class="tip-item">💡 试试问我："帮我总结一下这个文档"</div>
+              <div class="tip-item">🔍 开启网络搜索获取最新资讯</div>
+              <div class="tip-item">📚 选择知识库进行专业咨询</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 聊天消息 -->
         <div v-for="(msg, index) in messages" :key="index"
           :class="['message-item', msg.type === 'user' ? 'message-user' : 'message-bot']">
           <div class="avatar-container">
@@ -219,6 +283,7 @@ import {
   IconSearch,
   IconExclamation,
   IconMoreVertical,
+  IconBook,
 } from '@arco-design/web-vue/es/icon'
 import { Message, Modal, Form } from '@arco-design/web-vue'
 import { useRoute, useRouter } from 'vue-router'
@@ -871,7 +936,7 @@ const handleMoreActions = (key, item) => {
 watch(
   () => userStore.isLoggedIn(),
   async (isLoggedIn) => {
-    console.log('登录状态变化:', isLoggedIn)
+    console.log('Chat页面 - 登录状态变化:', isLoggedIn)
     if (isLoggedIn) {
       // 用户登录后，自动获取数据
       console.log('用户已登录，获取聊天数据')
@@ -893,18 +958,26 @@ watch(
       selectedKnowledge.value = null
       knowledgeList.value = []
     }
-  },
-  { immediate: true } // 确保组件挂载时立即执行
+  }
 );
 
 onMounted(async () => {
   window.addEventListener('resize', handleResize)
 
-  // 数据加载已在登录状态监听中处理，这里不再重复
-  // 只处理路由参数中的memoryId
-  if (userStore.isLoggedIn() && route.params.memoryId) {
-    // 如果路由中有memoryId参数，则自动切换到该对话
-    await switchChat(route.params.memoryId)
+  // 如果用户已登录，初始化数据
+  if (userStore.isLoggedIn()) {
+    console.log('Chat页面挂载 - 用户已登录，初始化数据')
+    // 获取知识库列表
+    await fetchKnowledgeList()
+    // 获取聊天历史
+    await fetchChatHistory()
+
+    // 处理路由参数中的memoryId
+    if (route.params.memoryId) {
+      await switchChat(route.params.memoryId)
+    } else if (chatHistory.value.length > 0) {
+      await switchChat(chatHistory.value[0].memoryId)
+    }
   }
 })
 
@@ -1523,6 +1596,249 @@ onBeforeUnmount(() => {
 
 .remove-file:hover {
   color: #666;
+}
+
+/* 欢迎界面样式 */
+.welcome-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 60vh;
+  padding: 40px 20px;
+  animation: fadeIn 0.6s ease;
+}
+
+.welcome-content {
+  max-width: 100%;
+  width: 100%;
+  background: transparent;
+  transition: all 0.3s ease;
+}
+
+.welcome-header {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  margin-bottom: 40px;
+  justify-content: center;
+}
+
+.welcome-icon {
+  width: 60px;
+  height: 60px;
+  background: linear-gradient(135deg, #3370FF 0%, #165DFF 100%);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  animation: pulse 2s infinite;
+}
+
+.welcome-icon :deep(.arco-icon) {
+  font-size: 28px;
+  color: #fff;
+}
+
+@keyframes pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(51, 112, 255, 0.3);
+  }
+  70% {
+    box-shadow: 0 0 0 15px rgba(51, 112, 255, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(51, 112, 255, 0);
+  }
+}
+
+.welcome-text {
+  text-align: left;
+}
+
+.welcome-title {
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--color-text-1);
+  margin: 0 0 8px 0;
+  background: linear-gradient(135deg, #3370FF 0%, #165DFF 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.welcome-subtitle {
+  font-size: 14px;
+  color: var(--color-text-2);
+  margin: 0;
+  line-height: 1.5;
+}
+
+.welcome-features {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 20px;
+  margin-bottom: 32px;
+}
+
+.feature-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 20px 16px;
+  border-radius: 12px;
+  background: var(--color-fill-1);
+  transition: all 0.3s ease;
+  text-align: center;
+  cursor: pointer;
+}
+
+.feature-item:hover {
+  transform: translateY(-3px);
+  background: var(--color-fill-2);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+}
+
+[arco-theme='dark'] .feature-item:hover {
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+}
+
+.feature-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #3370FF 0%, #165DFF 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.feature-icon :deep(.arco-icon) {
+  font-size: 22px;
+  color: #fff;
+}
+
+.feature-text {
+  width: 100%;
+}
+
+.feature-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text-1);
+  margin-bottom: 6px;
+}
+
+.feature-desc {
+  font-size: 12px;
+  color: var(--color-text-3);
+  line-height: 1.4;
+}
+
+.welcome-tips {
+  display: flex;
+  justify-content: center;
+  gap: 24px;
+  padding: 20px;
+  background: var(--color-fill-1);
+  border-radius: 12px;
+  border-left: 4px solid #3370FF;
+}
+
+.tip-item {
+  font-size: 13px;
+  color: var(--color-text-2);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  line-height: 1.4;
+  opacity: 0.8;
+}
+
+/* 移动端和平板适配 */
+@media screen and (max-width: 1200px) {
+  .welcome-features {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media screen and (max-width: 768px) {
+  .welcome-container {
+    min-height: 50vh;
+    padding: 20px 16px;
+  }
+
+  .welcome-header {
+    flex-direction: column;
+    text-align: center;
+    gap: 16px;
+    margin-bottom: 30px;
+  }
+
+  .welcome-text {
+    text-align: center;
+  }
+
+  .welcome-title {
+    font-size: 20px;
+  }
+
+  .welcome-subtitle {
+    font-size: 13px;
+  }
+
+  .welcome-features {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 16px;
+  }
+
+  .feature-item {
+    padding: 16px 12px;
+  }
+
+  .feature-icon {
+    width: 40px;
+    height: 40px;
+  }
+
+  .feature-icon :deep(.arco-icon) {
+    font-size: 18px;
+  }
+
+  .welcome-icon {
+    width: 50px;
+    height: 50px;
+  }
+
+  .welcome-icon :deep(.arco-icon) {
+    font-size: 24px;
+  }
+
+  .welcome-tips {
+    flex-direction: column;
+    gap: 12px;
+    text-align: center;
+  }
+
+  .tip-item {
+    justify-content: center;
+  }
+}
+
+@media screen and (max-width: 480px) {
+  .welcome-features {
+    grid-template-columns: 1fr;
+  }
+
+  .welcome-tips {
+    padding: 16px;
+  }
+
+  .tip-item {
+    font-size: 12px;
+  }
 }
 
 /* 调整消息列表底部间距 */
